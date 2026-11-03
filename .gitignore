@@ -1,0 +1,19 @@
+# Build output
+bin/
+obj/
+*.nupkg
+node_modules/
+dist/
+
+# Generated code (built in CI, never committed)
+ts/src/gen/
+
+# IDEs
+.vs/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.user
+
+# OS
+.DS_Store
