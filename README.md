@@ -16,8 +16,8 @@ Every message that crosses a process boundary is defined here, once:
 |---|---|---|
 | browser ↔ `api` | WebSocket, binary frames | `ClientMessage` / `ServerMessage` |
 | browser → `api` | REST | request/response bodies |
-| `api` ↔ `envmgr` | gRPC over a unix socket | `EnvironmentManager` service |
-| `envmgr` ↔ `harness` | vsock (or WebSocket in dev) | `HarnessFrame` |
+| `api` ↔ `envmgr` | gRPC over the WireGuard mesh (Hetzner box → Proxmox box) | `EnvironmentManager` service |
+| `envmgr` ↔ `harness` | WebSocket, one binary message per frame (every provider) | `HarnessFrame` |
 
 A field change is one PR here, then a version bump in each consumer.
 
@@ -29,7 +29,7 @@ All under `proto/kubernetes_learning/v1/`:
 |---|---|
 | `common.proto` | IDs, timestamps, errors |
 | `envmgr.proto` | The `EnvironmentManager` gRPC service, `Sandbox`, `SandboxStatus` |
-| `harness.proto` | `HarnessFrame` plus the exec, PTY, file and fault messages |
+| `harness.proto` | `HarnessFrame` plus the hello (sandbox id + one-time token), exec, PTY, file, fault and snapshot-request messages |
 | `topology.proto` | `Entity`, `Edge`, `TopologySnapshot`, `TopologyDiff`, `ClusterEvent`, `TrafficSample` |
 | `view.proto` | `ViewIntent`: focus, highlight, annotate, show_config, clear |
 | `session.proto` | `ClientMessage` / `ServerMessage` for the browser socket |
