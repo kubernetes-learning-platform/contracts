@@ -2,41 +2,39 @@
 
 > **The Protobuf schema for the whole system**, published as a NuGet package for .NET and an npm package for TypeScript.
 
-Part of [**kubernetes-learning-platform**](https://github.com/kubernetes-learning-platform/docs), a live Kubernetes lab with an optional AI helper. Start at the [docs hub](https://github.com/kubernetes-learning-platform/docs) for the big picture.
+Part of [kubernetes-learning-platform](https://github.com/kubernetes-learning-platform/docs), a live Kubernetes lab with an optional AI helper. The [docs repository](https://github.com/kubernetes-learning-platform/docs) describes the overall system.
 
 **Owner:** Filip · **Status:** planned layout. A `v0.1` with stub messages ships early in M1 so `api` and `web` can build against real types.
 
 ---
 
-## 🧭 What this repo does
+## Overview
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/contracts-dark.svg">
   <img src="assets/contracts-light.svg" width="100%" alt="The proto schema at the top publishes an npm package to web and NuGet packages to api, envmgr and the harness. Below, each boundary between those programs is labelled with the proto file that defines it: session and rest between web and api, envmgr between api and envmgr, harness between envmgr and the harness, and jobs through RabbitMQ.">
 </picture>
 
-The system is made of separate programs, and they only work together if they agree on the exact shape of every message they exchange. This repo is where that agreement is written down, once, as Protobuf files.
+The system consists of separate programs that exchange messages. This repository defines the structure of every one of those messages, once, in Protobuf.
 
-Nothing in here runs. The repo's output is two packages generated from the same files:
+The repository contains no runtime code. It produces two packages from the same schema:
 
-- a **NuGet** package for the .NET programs: `api`, `envmgr` and the `harness`
-- an **npm** package for the TypeScript frontend, `web`
+- a **NuGet** package for the .NET programs (`api`, `envmgr` and the `harness`)
+- an **npm** package for the TypeScript frontend (`web`)
 
-Nobody writes a message type by hand in another repo. They install the package and use the generated types, so a mismatch between two programs shows up as a compile error in the PR that causes it, before anything runs.
+Other repositories do not define message types by hand. They install the package and use the generated types, so an incompatible change is caught at compile time.
 
-**Reading the diagram.** The dashed lines are the packages going out to the programs that use them. The solid lines are the boundaries those programs talk across, each labelled with the file that defines it and what carries it. `topology` has no line of its own because it travels the whole way, from the harness to the browser, inside the other messages. `view` rides inside `session`, from `api` to the browser.
+In the diagram, dashed lines are packages delivered to their consumers. Solid lines are the boundaries between programs, labelled with the defining `.proto` file and the transport. `topology` messages are carried inside other messages from the harness to the browser, and `view` messages are carried inside `session` messages from `api` to the browser.
 
-### Follow one change
+### Change workflow
 
-1. You add a field to a message in a `.proto` file and open a PR.
-2. CI runs `buf lint` for style, and `buf breaking` to catch changes that would break programs already built against the schema.
-3. The merge publishes a prerelease of both packages.
-4. `sandbox`, `api` and `web` bump the package version.
-5. Their compilers now point at every place that has to handle the new field.
+1. A field is added or changed in a `.proto` file through a pull request.
+2. CI runs `buf lint` and `buf breaking`. The second check rejects changes that are incompatible with the schema on `main`.
+3. Merging publishes a prerelease of both packages.
+4. `sandbox`, `api` and `web` update the package version.
+5. Compilation in those repositories identifies the code that must handle the change.
 
-The whole system at a glance is in the [docs hub](https://github.com/kubernetes-learning-platform/docs#readme).
-
-## 🧩 Why one schema
+## Why one schema
 
 Every message that crosses a process boundary is defined here, once:
 
@@ -50,7 +48,7 @@ Every message that crosses a process boundary is defined here, once:
 
 A field change is one PR here, then a version bump in each consumer.
 
-## 📄 Proto files
+## Proto files
 
 All under `proto/kubernetes_learning/v1/`:
 
@@ -65,7 +63,7 @@ All under `proto/kubernetes_learning/v1/`:
 | `rest.proto` | REST request and response bodies |
 | `jobs.proto` | `ProvisionRequest`, `ProvisionResult`, `TeardownRequest` for the RabbitMQ work queue |
 
-## 📦 Packages
+## Packages
 
 | Package | Registry | Contents | Used by |
 |---|---|---|---|
@@ -74,7 +72,7 @@ All under `proto/kubernetes_learning/v1/`:
 
 The harness only uses the messages. Native AOT trimming drops the gRPC stubs.
 
-## 🏷️ Versioning
+## Versioning
 
 - A `vX.Y.Z` tag publishes a release.
 - Every merge to `main` publishes a prerelease, `X.Y.Z-main.<run>`, so consumers can try unreleased changes.
@@ -82,7 +80,7 @@ The harness only uses the messages. Native AOT trimming drops the gRPC stubs.
 - While on `0.x`, breaking changes are allowed but must bump the minor version.
 - The placeholder name has to be replaced **before 1.0**. After that, renaming the proto package is a breaking wire change. See [ARCHITECTURE §12](https://github.com/kubernetes-learning-platform/docs/blob/main/ARCHITECTURE.md#12-naming).
 
-## 📁 Layout
+## Layout
 
 ```
 contracts/
@@ -97,7 +95,7 @@ contracts/
 └── .github/workflows/ci.yml           # calls platform's proto-ci.yml
 ```
 
-## 🔑 Installing the packages
+## Installing the packages
 
 GitHub Packages needs a token even to read. Create a classic personal access token with `read:packages` once, and use it for both registries.
 
@@ -118,15 +116,15 @@ dotnet nuget add source https://nuget.pkg.github.com/kubernetes-learning-platfor
 //npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
 ```
 
-## 🛠️ Development
+## Development
 
 You'll need [buf](https://buf.build/docs/installation), the .NET 10 SDK and Node.js LTS. CI runs `platform`'s `proto-ci.yml`: buf lint and breaking checks, codegen, pack, and publish.
 
-## 📚 More
+## Further reading
 
 - [ARCHITECTURE §5 Contracts](https://github.com/kubernetes-learning-platform/docs/blob/main/ARCHITECTURE.md#5-contracts)
 - [ARCHITECTURE §6 Key flows](https://github.com/kubernetes-learning-platform/docs/blob/main/ARCHITECTURE.md#6-key-flows)
 
-## 📄 License
+## License
 
 [MIT](LICENSE)
