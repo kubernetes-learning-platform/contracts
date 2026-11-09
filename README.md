@@ -2,11 +2,39 @@
 
 > **The Protobuf schema for the whole system**, published as a NuGet package for .NET and an npm package for TypeScript.
 
-Part of [**kubernetes-learning-platform**](https://github.com/kubernetes-learning-platform/docs), an AI tutor with a live Kubernetes lab. Start at the [docs hub](https://github.com/kubernetes-learning-platform/docs) for the big picture.
+Part of [**kubernetes-learning-platform**](https://github.com/kubernetes-learning-platform/docs), a live Kubernetes lab with an optional AI helper. Start at the [docs hub](https://github.com/kubernetes-learning-platform/docs) for the big picture.
 
 **Owner:** Filip · **Status:** planned layout. A `v0.1` with stub messages ships early in M1 so `api` and `web` can build against real types.
 
 ---
+
+## 🧭 What this repo does
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/contracts-dark.svg">
+  <img src="assets/contracts-light.svg" width="100%" alt="The proto schema at the top publishes an npm package to web and NuGet packages to api, envmgr and the harness. Below, each boundary between those programs is labelled with the proto file that defines it: session and rest between web and api, envmgr between api and envmgr, harness between envmgr and the harness, and jobs through RabbitMQ.">
+</picture>
+
+The system is made of separate programs, and they only work together if they agree on the exact shape of every message they exchange. This repo is where that agreement is written down, once, as Protobuf files.
+
+Nothing in here runs. The repo's output is two packages generated from the same files:
+
+- a **NuGet** package for the .NET programs: `api`, `envmgr` and the `harness`
+- an **npm** package for the TypeScript frontend, `web`
+
+Nobody writes a message type by hand in another repo. They install the package and use the generated types, so a mismatch between two programs shows up as a compile error in the PR that causes it, before anything runs.
+
+**Reading the diagram.** The dashed lines are the packages going out to the programs that use them. The solid lines are the boundaries those programs talk across, each labelled with the file that defines it and what carries it. `topology` has no line of its own because it travels the whole way, from the harness to the browser, inside the other messages. `view` rides inside `session`, from `api` to the browser.
+
+### Follow one change
+
+1. You add a field to a message in a `.proto` file and open a PR.
+2. CI runs `buf lint` for style, and `buf breaking` to catch changes that would break programs already built against the schema.
+3. The merge publishes a prerelease of both packages.
+4. `sandbox`, `api` and `web` bump the package version.
+5. Their compilers now point at every place that has to handle the new field.
+
+The whole system at a glance is in the [docs hub](https://github.com/kubernetes-learning-platform/docs#readme).
 
 ## 🧩 Why one schema
 

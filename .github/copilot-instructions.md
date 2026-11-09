@@ -1,6 +1,6 @@
 # Copilot instructions: contracts
 
-This repo holds the Protobuf schema for kubernetes-learning-platform, an AI tutor with a live Kubernetes lab. Every message that crosses a process boundary is defined here: browser ↔ api (WebSocket), api ↔ envmgr (gRPC over the WireGuard mesh), envmgr ↔ harness (WebSocket, one `HarnessFrame` per binary message), sandbox start and teardown requests (RabbitMQ), and REST bodies. The full design is in the `docs` repo (ARCHITECTURE.md §5).
+This repo holds the Protobuf schema for kubernetes-learning-platform, a live Kubernetes lab with an optional AI helper. Every message that crosses a process boundary is defined here: browser ↔ api (WebSocket), api ↔ envmgr (gRPC over the WireGuard mesh), envmgr ↔ harness (WebSocket, one `HarnessFrame` per binary message), sandbox start and teardown requests (RabbitMQ), and REST bodies. The full design is in the `docs` repo (ARCHITECTURE.md §5).
 
 ## Layout
 - `proto/kubernetes_learning/v1/`: `common`, `envmgr`, `harness`, `topology`, `view`, `session`, `rest`, `jobs`.
