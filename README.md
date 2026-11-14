@@ -87,7 +87,7 @@ Decided on 2026-11-14.
 
 - CI pushes the `vX.Y.Z` tag itself. The first release is `v0.1.0`.
 - `buf lint` and `buf breaking` (against `main`) gate every PR, and a break without `!` in the title fails it.
-- After publishing, CI notifies `sandbox`, `api` and `web` with a GitHub App token stored only in this repo. Each runs `platform`'s `contracts-bump.yml`, which sets the new version, builds, tests, and pushes to `main` with that repo's own token, or opens a PR if the build fails.
+- After publishing, CI notifies `sandbox`, `api` and `web` with a GitHub App token. Each runs `platform`'s `contracts-bump.yml`, which sets the new version, builds, tests, and pushes to `main` with the same App's token, or opens a PR if the build fails. The App is on each repo's `main` ruleset bypass list, so the bump needs no PR; its key is an organization secret.
 - The placeholder name has to be replaced **before 1.0**. After that, renaming the proto package is a breaking wire change. See [ARCHITECTURE §12](https://github.com/kubernetes-learning-platform/docs/blob/main/ARCHITECTURE.md#12-naming).
 
 ## Layout
