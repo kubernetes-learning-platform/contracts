@@ -28,11 +28,11 @@ In the diagram, dashed lines are packages delivered to their consumers. Solid li
 
 ### Change workflow
 
-1. A field is added or changed in a `.proto` file through a pull request.
-2. CI runs `buf lint` and `buf breaking`. The second check rejects changes that are incompatible with the schema on `main`.
-3. Merging publishes a prerelease of both packages.
-4. `sandbox`, `api` and `web` update the package version.
-5. Compilation in those repositories identifies the code that must handle the change.
+1. A field is added or changed in a `.proto` file through a pull request. Anyone can open it; Filip reviews it.
+2. CI runs `buf lint` and `buf breaking`. A breaking change fails the PR unless its title marks it with `!`, as in `feat!: rename sandbox status`.
+3. Merging publishes a release of both packages. The version comes from the PR title (see [Versioning](#versioning)).
+4. A bot moves `sandbox`, `api` and `web` to the new version. In each one it builds and runs the tests, then pushes `build(deps): bump contracts to X.Y.Z` to `main`. Nobody writes a bump PR.
+5. If a repo no longer builds, which only a breaking change can cause, the bot opens a PR there instead, and that repo's owner fixes the code in it.
 
 ## Why one schema
 
@@ -42,8 +42,8 @@ Every message that crosses a process boundary is defined here, once:
 |---|---|---|
 | browser ↔ `api` | WebSocket, binary frames | `ClientMessage` / `ServerMessage` |
 | browser → `api` | REST | request/response bodies |
-| `api` ↔ `envmgr` | gRPC over the WireGuard mesh (Hetzner box → Proxmox box) | `EnvironmentManager` service |
-| `api` ↔ `envmgr` | RabbitMQ over the WireGuard mesh (sandbox start and teardown only) | `ProvisionRequest`, `ProvisionResult`, `TeardownRequest` |
+| `api` ↔ `envmgr` | gRPC on the course VM, plain HTTP/2 | `EnvironmentManager` service |
+| `api` ↔ `envmgr` | RabbitMQ (sandbox start and teardown only) | `ProvisionRequest`, `ProvisionResult`, `TeardownRequest` |
 | `envmgr` ↔ `harness` | WebSocket, one binary message per frame (every provider) | `HarnessFrame` |
 
 A field change is one PR here, then a version bump in each consumer.
@@ -74,10 +74,20 @@ The harness only uses the messages. Native AOT trimming drops the gRPC stubs.
 
 ## Versioning
 
-- A `vX.Y.Z` tag publishes a release.
-- Every merge to `main` publishes a prerelease, `X.Y.Z-main.<run>`, so consumers can try unreleased changes.
-- `buf lint` and `buf breaking` (against `main`) gate every PR.
-- While on `0.x`, breaking changes are allowed but must bump the minor version.
+Decided on 2026-11-14.
+
+- Every merge to `main` that changes the schema or the package projects publishes a normal release of both packages. There are no prereleases and no hand-made tags.
+- CI picks the version from the commit subject, which is the squashed PR title:
+
+  | PR title | While on `0.x` |
+  |---|---|
+  | `feat!:` or `fix!:` (breaking) | Minor bump: `0.3.4` → `0.4.0` |
+  | `feat:` or `fix:` | Patch bump: `0.3.4` → `0.3.5` |
+  | Any other type (`docs:`, `ci:`, `chore:` …) | Nothing is published |
+
+- CI pushes the `vX.Y.Z` tag itself. The first release is `v0.1.0`.
+- `buf lint` and `buf breaking` (against `main`) gate every PR, and a break without `!` in the title fails it.
+- After publishing, CI notifies `sandbox`, `api` and `web` with a GitHub App token stored only in this repo. Each runs `platform`'s `contracts-bump.yml`, which sets the new version, builds, tests, and pushes to `main` with that repo's own token, or opens a PR if the build fails.
 - The placeholder name has to be replaced **before 1.0**. After that, renaming the proto package is a breaking wire change. See [ARCHITECTURE §12](https://github.com/kubernetes-learning-platform/docs/blob/main/ARCHITECTURE.md#12-naming).
 
 ## Layout
@@ -118,7 +128,7 @@ dotnet nuget add source https://nuget.pkg.github.com/kubernetes-learning-platfor
 
 ## Development
 
-You'll need [buf](https://buf.build/docs/installation), the .NET 10 SDK and Node.js LTS. CI runs `platform`'s `proto-ci.yml`: buf lint and breaking checks, codegen, pack, and publish.
+You'll need [buf](https://buf.build/docs/installation), the .NET 10 SDK and Node.js LTS. CI runs `platform`'s `proto-ci.yml`: buf lint and breaking checks, codegen, pack, and on `main` the release and the notification to the consumers.
 
 ## Further reading
 

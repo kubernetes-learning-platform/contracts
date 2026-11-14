@@ -1,6 +1,6 @@
 # Copilot instructions: contracts
 
-This repo holds the Protobuf schema for kubernetes-learning-platform, a live Kubernetes lab with an optional AI helper. Every message that crosses a process boundary is defined here: browser ↔ api (WebSocket), api ↔ envmgr (gRPC over the WireGuard mesh), envmgr ↔ harness (WebSocket, one `HarnessFrame` per binary message), sandbox start and teardown requests (RabbitMQ), and REST bodies. The full design is in the `docs` repo (ARCHITECTURE.md §5).
+This repo holds the Protobuf schema for kubernetes-learning-platform, a live Kubernetes lab with an optional AI helper. Every message that crosses a process boundary is defined here: browser ↔ api (WebSocket), api ↔ envmgr (gRPC on the same VM), envmgr ↔ harness (WebSocket, one `HarnessFrame` per binary message), sandbox start and teardown requests (RabbitMQ), and REST bodies. The full design is in the `docs` repo (ARCHITECTURE.md §5).
 
 ## Layout
 - `proto/kubernetes_learning/v1/`: `common`, `envmgr`, `harness`, `topology`, `view`, `session`, `rest`, `jobs`.
@@ -8,7 +8,7 @@ This repo holds the Protobuf schema for kubernetes-learning-platform, a live Kub
 - `ts/`: npm package `@kubernetes-learning-platform/contracts`, generated with protobuf-es. `ts/src/gen/` is generated and never committed.
 
 ## When reviewing, focus on
-- **Wire compatibility.** Flag changed field numbers or types, reused numbers, and removed fields or enum values without a `reserved` entry for both the number and the name. While on `0.x`, a breaking change is allowed but needs a minor version bump. Say so explicitly.
+- **Wire compatibility.** Flag changed field numbers or types, reused numbers, and removed fields or enum values without a `reserved` entry for both the number and the name. While on `0.x`, a breaking change is allowed, but the PR title must carry `!` (e.g. `feat!: …`), because the title sets the version: `!` bumps the minor, `feat`/`fix` bump the patch, other types publish nothing. Flag a breaking change whose title has no `!`, and a schema change titled `docs:` or `chore:`, which would publish nothing.
 - **buf lint style.** Messages and enums in PascalCase, fields in snake_case, the first enum value is `<ENUM>_UNSPECIFIED = 0`, and enum values are prefixed with the enum name.
 - **Placement.** A new message goes in the file for its boundary (e.g. browser socket messages in `session.proto`). `ServerMessage` / `ClientMessage` / `HarnessFrame` grow through their `oneof`.
 - **Comments.** Every message and every non-obvious field has a short comment. Consumers read these as the API docs.
