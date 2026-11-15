@@ -42,6 +42,8 @@ Not set up yet; contracts#1 adds the exact commands here. The checks CI will run
 
 Run them before saying a change is done.
 
+**Lint configs.** `.editorconfig`, `Directory.Build.props`, `biome.json` and `.lint-sync` are copies from `platform/lint/`. Don't edit them here; change `platform/lint/` instead, and CI fails a hand edit. contracts#1 makes the first copy with `lint/sync.sh --dotnet --node`. Keep `ts/src/gen/` in `.gitignore`: that is also how Biome skips the generated code. Pin `@biomejs/biome` to the exact version in `biome.json`'s `$schema` (2.6.4). New lint configs arrive as bot commits, `chore: sync lint configs`, which never publish; if the new rules break the build, the bot opens a PR instead.
+
 ## Schema rules
 
 - **Wire compatibility.** Never change a field's number or type, or reuse a number. Removing a field or enum value needs a `reserved` entry for both the number and the name.
@@ -72,7 +74,7 @@ The PR title decides the release, so pick its type deliberately:
 - **Types:** `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`, `style`. Add `!` for a breaking change.
 - **Branches:** use the name in the `Branch:` line of the issue being worked on. Don't make one up. `gh issue develop <number> --name <branch> --checkout` creates it linked to the issue.
 - **Where changes land:** while the repo is still empty, documentation goes straight to `main`. From the setup issues on (contracts#1), every change goes through a PR from the issue's branch.
-- **PRs:** the title follows the commit format, at most 72 characters; it becomes the squash commit on `main`. The description is one or two plain sentences, plus `Closes #<number>`. Merging needs one approval from someone other than the author. Filip is requested as reviewer on every PR (`.github/CODEOWNERS`), and the author is assigned automatically. Only Filip merges.
+- **PRs:** the title follows the commit format, at most 72 characters; it becomes the squash commit on `main`. The description is one or two plain sentences, plus `Closes #<number>`. Merging needs one approval from someone other than the author, and the branch must be up to date with `main`. Filip is requested as reviewer on every PR (`.github/CODEOWNERS`), and the author is assigned automatically. Only Filip merges.
 - **Public repo:** everything committed is public at once. Never commit secrets, real `.env` files or personal data; push protection only catches known token formats.
 
 ## Keep docs in sync

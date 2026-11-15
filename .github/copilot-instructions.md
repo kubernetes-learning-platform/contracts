@@ -21,4 +21,5 @@ This repo holds the Protobuf schema for kubernetes-learning-platform, a live Kub
 
 ## Don't
 - Don't comment on formatting that `buf format` or `.editorconfig` already handles.
+- Don't suggest changes to the lint copies (`.editorconfig`, `Directory.Build.props`, `biome.json`, `.lint-sync`). They come from `platform/lint/`, and a hand edit fails CI.
 - Keep reviews short. Skip praise and summaries of the diff.
