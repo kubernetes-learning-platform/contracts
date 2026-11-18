@@ -5,7 +5,7 @@ This repo holds the Protobuf schema for kubernetes-learning-platform, a live Kub
 ## Layout
 - `proto/kubernetes_learning/v1/`: `common`, `envmgr`, `harness`, `topology`, `view`, `session`, `rest`, `jobs`.
 - `dotnet/KubernetesLearning.Contracts/`: NuGet package. `Grpc.Tools` compiles the protos at build time.
-- `ts/`: npm package `@kubernetes-learning-platform/contracts`, generated with protobuf-es. `ts/src/gen/` is generated and never committed.
+- `ts/`: npm package `@kubernetes-learning-platform/contracts`, generated with protobuf-es. `ts/src/gen/` is generated and never committed; `ts/src/index.ts` re-exports one `<file>_pb.js` per proto file, so a new proto file needs a line there.
 
 ## When reviewing, focus on
 - **Wire compatibility.** Flag changed field numbers or types, reused numbers, and removed fields or enum values without a `reserved` entry for both the number and the name. While on `0.x`, a breaking change is allowed, but the PR title must carry `!` (e.g. `feat!: …`), because the title sets the version: `!` bumps the minor, `feat`/`fix` bump the patch, other types publish nothing. Flag a breaking change whose title has no `!`, and a schema change titled `docs:` or `chore:`, which would publish nothing.

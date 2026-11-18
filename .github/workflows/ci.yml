@@ -1,0 +1,14 @@
+name: ci
+
+# Runs platform's Protobuf checks; edited reruns them when the title gains or loses a !.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  ci:
+    permissions:
+      contents: read
+    uses: kubernetes-learning-platform/platform/.github/workflows/proto-ci.yml@main
