@@ -17,7 +17,7 @@ The Protobuf schema for kubernetes-learning-platform, a live Kubernetes lab with
 The repo has no runtime code. It publishes two packages from the same schema: `KubernetesLearning.Contracts` (NuGet, for `sandbox` and `api`) and `@kubernetes-learning-platform/contracts` (npm, for `web`).
 
 - **Owner:** Filip. Teammates open schema PRs; Filip reviews them.
-- **Status:** planned layout. contracts#1 sets up buf and the packages, contracts#2 the publishing.
+- **Status:** buf and both packages are set up (contracts#1). `common.proto` holds only the package declaration; the v0.1 schema comes next. contracts#2 adds the publishing.
 - **Design:** `README.md` here, and ARCHITECTURE §5 in the `docs` repo. Where they disagree, the `docs` repo wins.
 
 ## Layout
@@ -25,24 +25,30 @@ The repo has no runtime code. It publishes two packages from the same schema: `K
 ```
 contracts/
 ├── proto/kubernetes_learning/v1/          # common, envmgr, harness, topology, view, session, rest, jobs
-├── buf.yaml                               # lint + breaking rules
-├── buf.gen.yaml                           # protobuf-es codegen
+├── buf.yaml                               # lint (STANDARD) + breaking (FILE) rules
+├── buf.gen.yaml                           # protobuf-es codegen into ts/src/gen/
+├── global.json                            # SDK 10.0
 ├── dotnet/KubernetesLearning.Contracts/   # NuGet; Grpc.Tools compiles ../../proto at build time
-├── ts/                                    # npm package; src/gen/ is generated, never committed
-└── .github/workflows/                     # call platform's reusable workflows
+├── ts/                                    # npm package; src/index.ts re-exports src/gen/, which is never committed
+└── .github/workflows/                     # ci.yml calls platform's proto-ci.yml
 ```
 
 ## Build and check
 
-Not set up yet; contracts#1 adds the exact commands here. The checks CI will run:
+You need the buf CLI (CI uses 1.75.0; `npx @bufbuild/buf@1.75.0` works without installing it), the .NET 10 SDK and Node.js 24. Before saying a change is done, run what CI runs, from the repo root unless noted:
 
-- `buf lint`
+- `buf lint` and `buf format --diff --exit-code`
 - `buf breaking --against '.git#branch=main'`
-- build the .NET package and the TypeScript package
+- `npm ci` in `ts/`, then `buf generate` (it uses `ts/node_modules/.bin/protoc-gen-es`)
+- in `dotnet/KubernetesLearning.Contracts/`: `dotnet format --verify-no-changes` and `dotnet build -c Release`
+- in `ts/`: `npx biome ci .`, `npm run build` and `npx tsc --noEmit`
+- `../platform/lint/sync.sh --check --dotnet --node .`, with `platform` at the commit in `.lint-sync`
 
-Run them before saying a change is done.
+CI (`.github/workflows/ci.yml`) reports `ci / Protobuf checks`, required in the `main` ruleset. It also runs on title edits, because the title decides whether a break is allowed. `Grpc.Tools` 2.85.0 ships a universal macOS `protoc`, so the .NET build works on Apple silicon; don't go below it.
 
-**Lint configs.** `.editorconfig`, `Directory.Build.props`, `biome.json` and `.lint-sync` are copies from `platform/lint/`. Don't edit them here; change `platform/lint/` instead, and CI fails a hand edit. contracts#1 makes the first copy with `lint/sync.sh --dotnet --node`. Keep `ts/src/gen/` in `.gitignore`: that is also how Biome skips the generated code. Pin `@biomejs/biome` to the exact version in `biome.json`'s `$schema` (2.6.4). New lint configs arrive as bot commits, `chore: sync lint configs`, which never publish; if the new rules break the build, the bot opens a PR instead.
+**New proto files.** Add an `export * from "./gen/kubernetes_learning/v1/<file>_pb.js";` line to `ts/src/index.ts` for each one. The .NET project picks up every file under `proto/` by itself.
+
+**Lint configs.** `.editorconfig`, `Directory.Build.props`, `biome.json` and `.lint-sync` are copies from `platform/lint/`. Don't edit them here; change `platform/lint/` instead, and CI fails a hand edit. They were made with `lint/sync.sh --dotnet --node`. Keep `ts/src/gen/` in `.gitignore`: that is also how Biome skips the generated code. Pin `@biomejs/biome` to the exact version in `biome.json`'s `$schema` (2.6.4). New lint configs arrive as bot commits, `chore: sync lint configs`, which never publish; if the new rules break the build, the bot opens a PR instead.
 
 ## Schema rules
 

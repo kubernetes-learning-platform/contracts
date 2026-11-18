@@ -4,7 +4,7 @@
 
 Part of [kubernetes-learning-platform](https://github.com/kubernetes-learning-platform/docs), a live Kubernetes lab with an optional AI helper. The [docs repository](https://github.com/kubernetes-learning-platform/docs) describes the overall system.
 
-**Owner:** Filip · **Status:** planned layout. A `v0.1` with stub messages ships early in M1 so `api` and `web` can build against real types.
+**Owner:** Filip · **Status:** buf and both packages are set up; the schema itself is not written yet. A `v0.1` with stub messages ships early in M1 so `api` and `web` can build against real types.
 
 ---
 
@@ -97,11 +97,14 @@ contracts/
 ├── proto/kubernetes_learning/v1/      # the .proto files above
 ├── buf.yaml                           # lint + breaking rules
 ├── buf.gen.yaml                       # protobuf-es codegen
+├── global.json                        # .NET SDK 10.0
 ├── dotnet/KubernetesLearning.Contracts/
 │   └── KubernetesLearning.Contracts.csproj   # Grpc.Tools compiles ../../proto at build time
 ├── ts/
 │   ├── package.json                   # @kubernetes-learning-platform/contracts
-│   └── src/gen/                       # generated, not committed
+│   └── src/
+│       ├── index.ts                   # re-exports each generated file
+│       └── gen/                       # generated, not committed
 └── .github/workflows/ci.yml           # calls platform's proto-ci.yml
 ```
 
@@ -128,7 +131,18 @@ dotnet nuget add source https://nuget.pkg.github.com/kubernetes-learning-platfor
 
 ## Development
 
-You'll need [buf](https://buf.build/docs/installation), the .NET 10 SDK and Node.js LTS. CI runs `platform`'s `proto-ci.yml`: buf lint and breaking checks, codegen, pack, and on `main` the release and the notification to the consumers.
+You'll need [buf](https://buf.build/docs/installation) (or `npx @bufbuild/buf`), the .NET 10 SDK and Node.js 24.
+
+```bash
+buf lint && buf format --diff --exit-code
+(cd ts && npm ci) && buf generate
+(cd dotnet/KubernetesLearning.Contracts && dotnet build -c Release)
+(cd ts && npx biome ci . && npm run build)
+```
+
+A new proto file needs an `export *` line in `ts/src/index.ts`; the .NET project picks it up by itself.
+
+On every PR, CI runs `platform`'s `proto-ci.yml`: the lint-copy check, buf lint, format and breaking checks, codegen, and both package builds.
 
 ## Further reading
 

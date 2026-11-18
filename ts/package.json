@@ -1,0 +1,38 @@
+{
+  "name": "@kubernetes-learning-platform/contracts",
+  "version": "0.0.0",
+  "description": "Protobuf messages for kubernetes-learning-platform, generated with protobuf-es.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kubernetes-learning-platform/contracts.git",
+    "directory": "ts"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "biome check",
+    "format": "biome format --write"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.17.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4",
+    "@bufbuild/protoc-gen-es": "^2.17.0",
+    "typescript": "^5.9.3"
+  }
+}

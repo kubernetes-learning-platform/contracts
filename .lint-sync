@@ -1,0 +1,4 @@
+# Written by platform/lint/sync.sh. Don't edit.
+commit=e13979765ffc6979f7a84f6ca862d22ef264fa92
+dotnet=true
+node=true
