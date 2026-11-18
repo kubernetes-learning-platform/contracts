@@ -1,0 +1,28 @@
+name: release
+
+# Publishes a release when a merge to main changes the schema or a package; the commit subject picks the version.
+on:
+  push:
+    branches: [main]
+    paths:
+      - proto/**
+      - dotnet/**
+      - ts/**
+      - buf.gen.yaml
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      packages: write
+    uses: kubernetes-learning-platform/platform/.github/workflows/proto-release.yml@main
+    with:
+      update-bot-app-id: ${{ vars.UPDATE_BOT_APP_ID }}
+    secrets:
+      update-bot-private-key: ${{ secrets.UPDATE_BOT_PRIVATE_KEY }}
