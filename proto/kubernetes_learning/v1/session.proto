@@ -225,7 +225,7 @@ message ChatMessage {
 // The helper started a tool, shown as a step in the chat.
 message ToolCallStarted {
   string call_id = 1;
-  // The tool's name, such as "run_command" or "focus".
+  // The tool's name, such as "exec" or "focus".
   string tool = 2;
   // One line for the chat, such as "Checking the pods in shop".
   string summary = 3;
