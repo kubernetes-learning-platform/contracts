@@ -33,6 +33,8 @@ contracts/
 └── .github/workflows/                     # ci.yml calls platform's proto-ci.yml
 ```
 
+Scripts, when there are any, go in `scripts/`.
+
 ## Build and check
 
 You need the buf CLI (CI uses 1.75.0; `npx @bufbuild/buf@1.75.0` works without installing it), the .NET 10 SDK and Node.js 24. Before saying a change is done, run what CI runs, from the repo root unless noted:
