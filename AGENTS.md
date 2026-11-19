@@ -17,7 +17,7 @@ The Protobuf schema for kubernetes-learning-platform, a live Kubernetes lab with
 The repo has no runtime code. It publishes two packages from the same schema: `KubernetesLearning.Contracts` (NuGet, for `sandbox` and `api`) and `@kubernetes-learning-platform/contracts` (npm, for `web`).
 
 - **Owner:** Filip. Teammates open schema PRs; Filip reviews them.
-- **Status:** buf and both packages are set up (contracts#1). `common.proto` holds only the package declaration; the v0.1 schema comes next. contracts#2 adds the publishing.
+- **Status:** the v0.1 schema is in `proto/` (contracts#8), from the `docs` repo's `plans/schema-v0.1.md`. Every schema merge to `main` publishes both packages (contracts#2).
 - **Design:** `README.md` here, and ARCHITECTURE §5 in the `docs` repo. Where they disagree, the `docs` repo wins.
 
 ## Layout
@@ -54,7 +54,8 @@ CI (`.github/workflows/ci.yml`) reports `ci / Protobuf checks`, required in the 
 
 - **Wire compatibility.** Never change a field's number or type, or reuse a number. Removing a field or enum value needs a `reserved` entry for both the number and the name.
 - **Style.** Messages and enums in PascalCase, fields in snake_case. The first enum value is `<ENUM>_UNSPECIFIED = 0`, and every value is prefixed with the enum name.
-- **Placement.** A message goes in the file for its boundary. `ClientMessage`, `ServerMessage` and `HarnessFrame` grow through their `oneof`.
+- **Placement.** A message goes in the file for its boundary. `ClientMessage`, `ServerMessage` and `HarnessFrame` grow through their `oneof`. Every file shares one package, so a message or enum name must be unique across all of them.
+- **Conventions.** IDs are strings (UUIDs, or Kubernetes UIDs for topology entities). Times are `google.protobuf.Timestamp` and `Duration`. A request carries a sender-chosen `request_id` and its reply carries it back. Failures use `Error` from `common.proto`. REST bodies use the proto3 JSON mapping. `README.md` lists the details.
 - **Comments.** Every message and every non-obvious field gets a short comment; consumers read them as the API docs.
 - **Generated code** (`ts/src/gen/`, `bin/`, `obj/`) is never committed.
 - **Naming.** The proto package stays `kubernetes_learning.v1`. The name is a placeholder that is renamed before 1.0, so don't hardcode it anywhere new.

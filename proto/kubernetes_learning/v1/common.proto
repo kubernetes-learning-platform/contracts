@@ -1,3 +1,43 @@
 syntax = "proto3";
 
 package kubernetes_learning.v1;
+
+// A failed request, in a reply message, a server message or a REST error body.
+message Error {
+  // What went wrong, for code to act on.
+  ErrorCode code = 1;
+  // One sentence for people, safe to show in the UI.
+  string message = 2;
+  // Whether the same request can succeed if it is sent again later.
+  bool retryable = 3;
+}
+
+// The kind of failure.
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  // The request is malformed or names something invalid.
+  ERROR_CODE_INVALID_ARGUMENT = 1;
+  // What the request names doesn't exist.
+  ERROR_CODE_NOT_FOUND = 2;
+  // The request clashes with the current state, such as a second active session.
+  ERROR_CODE_CONFLICT = 3;
+  // Not allowed right now, such as terminal input or Apply while the helper is acting.
+  ERROR_CODE_FORBIDDEN = 4;
+  // Something the request needs is down, such as the sandbox link while reconnecting.
+  ERROR_CODE_UNAVAILABLE = 5;
+  // The session's helper token budget is used up.
+  ERROR_CODE_BUDGET_EXHAUSTED = 6;
+  // An unexpected failure on the server.
+  ERROR_CODE_INTERNAL = 7;
+}
+
+// Who caused something, for the replay timeline and the terminal's mirrored commands.
+enum Actor {
+  ACTOR_UNSPECIFIED = 0;
+  ACTOR_LEARNER = 1;
+  ACTOR_HELPER = 2;
+  // The scenario runner, such as when it applies a step or injects a fault.
+  ACTOR_SCENARIO = 3;
+  // api itself, such as session status changes.
+  ACTOR_SYSTEM = 4;
+}

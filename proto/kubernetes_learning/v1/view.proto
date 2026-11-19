@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package kubernetes_learning.v1;
+
+// Where the helper wants the learner to look. Only the helper's view tools produce these.
+message ViewIntent {
+  // Unique per intent, for the replay timeline.
+  string id = 1;
+  oneof action {
+    Focus focus = 2;
+    Highlight highlight = 3;
+    Annotate annotate = 4;
+    ShowConfig show_config = 5;
+    Clear clear = 6;
+  }
+}
+
+// Pans and zooms the graph to fit the targets.
+message Focus {
+  // Entity IDs.
+  repeated string target_ids = 1;
+}
+
+// Marks entities or edges until they are cleared.
+message Highlight {
+  // Entity or edge IDs.
+  repeated string target_ids = 1;
+}
+
+// Pins a note to an entity or edge. The lab's "Helper markup" pill counts the live notes.
+message Annotate {
+  // Names the note, so Clear can remove it.
+  string annotation_id = 1;
+  // An entity or edge ID.
+  string target_id = 2;
+  string text = 3;
+}
+
+// Opens the inspector on an entity.
+message ShowConfig {
+  string entity_id = 1;
+}
+
+// Removes helper markup.
+message Clear {
+  // Annotation IDs and highlighted target IDs. Empty clears all helper markup.
+  repeated string ids = 1;
+}
