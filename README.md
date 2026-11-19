@@ -122,24 +122,43 @@ contracts/
 
 ## Installing the packages
 
-GitHub Packages needs a token even to read. Create a classic personal access token with `read:packages` once, and use it for both registries.
+GitHub Packages needs a token even to read. A consuming repo commits its registry config, which reads the token from `GITHUB_PACKAGES_TOKEN`, so nobody adds a package source by hand. [The contracts packages](https://github.com/kubernetes-learning-platform/docs#the-contracts-packages) in the docs repo shows how each person sets the variable.
 
-**.NET**
+**.NET:** `nuget.config` at the repo root, as in `sandbox` and `api`. The source mapping takes `KubernetesLearning.*` only from GitHub Packages and everything else from nuget.org:
 
-```bash
-dotnet nuget add source https://nuget.pkg.github.com/kubernetes-learning-platform/index.json \
-  --name kubernetes-learning-platform \
-  --username YOUR_GITHUB_USERNAME \
-  --password YOUR_TOKEN \
-  --store-password-in-clear-text
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+    <add key="github" value="https://nuget.pkg.github.com/kubernetes-learning-platform/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+    <packageSource key="github">
+      <package pattern="KubernetesLearning.*" />
+    </packageSource>
+  </packageSourceMapping>
+  <packageSourceCredentials>
+    <github>
+      <add key="Username" value="kubernetes-learning-platform" />
+      <add key="ClearTextPassword" value="%GITHUB_PACKAGES_TOKEN%" />
+    </github>
+  </packageSourceCredentials>
+</configuration>
 ```
 
-**npm** (`.npmrc` in the consuming repo, with the token in an env var):
+**npm:** `.npmrc` at the repo root, as in `web`:
 
 ```ini
 @kubernetes-learning-platform:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
 ```
+
+**CI:** the job grants `packages: read` and passes its `GITHUB_TOKEN` as `GITHUB_PACKAGES_TOKEN`, which `platform`'s `dotnet-ci` and `node-ci` already do. A new consuming repo also needs read access on both packages under **Manage Actions access**, or its restore fails with 403.
 
 ## Development
 
