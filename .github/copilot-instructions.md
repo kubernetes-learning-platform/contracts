@@ -10,7 +10,8 @@ This repo holds the Protobuf schema for kubernetes-learning-platform, a live Kub
 ## When reviewing, focus on
 - **Wire compatibility.** Flag changed field numbers or types, reused numbers, and removed fields or enum values without a `reserved` entry for both the number and the name. While on `0.x`, a breaking change is allowed, but the PR title must carry `!` (e.g. `feat!: …`), because the title sets the version: `!` bumps the minor, `feat`/`fix` bump the patch, other types publish nothing. Flag a breaking change whose title has no `!`, and a schema change titled `docs:` or `chore:`, which would publish nothing.
 - **buf lint style.** Messages and enums in PascalCase, fields in snake_case, the first enum value is `<ENUM>_UNSPECIFIED = 0`, and enum values are prefixed with the enum name.
-- **Placement.** A new message goes in the file for its boundary (e.g. browser socket messages in `session.proto`). `ServerMessage` / `ClientMessage` / `HarnessFrame` grow through their `oneof`.
+- **Placement.** A new message goes in the file for its boundary (e.g. browser socket messages in `session.proto`). `ServerMessage` / `ClientMessage` / `HarnessFrame` grow through their `oneof`. Every file shares the package `kubernetes_learning.v1`, so flag a message or enum name that is too generic to stay unique.
+- **Conventions.** IDs are strings, times are `google.protobuf.Timestamp` / `Duration`, a reply carries its request's `request_id`, and failures use `Error` from `common.proto`. Flag a new message that breaks one of these.
 - **Comments.** Every message and every non-obvious field has a short comment. Consumers read these as the API docs.
 - **Generated code** committed by mistake (`ts/src/gen/`, `bin/`, `obj/`).
 - **Naming.** The proto package must stay `kubernetes_learning.v1`. The name is a placeholder that gets renamed before 1.0, so don't hardcode it anywhere new.

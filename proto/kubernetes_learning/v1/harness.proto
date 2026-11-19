@@ -1,0 +1,391 @@
+syntax = "proto3";
+
+package kubernetes_learning.v1;
+
+import "google/protobuf/duration.proto";
+import "kubernetes_learning/v1/common.proto";
+import "kubernetes_learning/v1/topology.proto";
+
+// One message between the harness and envmgr, which relays it unchanged to and from api. There is one connection per sandbox, so frames carry no session ID.
+message HarnessFrame {
+  oneof body {
+    // From the harness, first on every connection.
+    Hello hello = 1;
+    // To the harness.
+    SnapshotRequest snapshot_request = 2;
+    // From the harness, while the cluster boots and whenever its state changes.
+    ClusterStatus cluster_status = 3;
+
+    // To the harness.
+    ExecRequest exec = 4;
+    // From the harness.
+    ExecOutput exec_output = 5;
+    // From the harness, last for each exec.
+    ExecExit exec_exit = 6;
+
+    // To the harness.
+    PtyOpen pty_open = 7;
+    // To the harness.
+    PtyInput pty_input = 8;
+    // From the harness.
+    PtyOutput pty_output = 9;
+    // To the harness.
+    PtyResize pty_resize = 10;
+    // From the harness.
+    PtyClosed pty_closed = 11;
+
+    // To the harness.
+    FileWrite file_write = 12;
+    // To the harness.
+    FileRead file_read = 13;
+    // From the harness.
+    FileResult file_result = 14;
+
+    // To the harness.
+    ManifestRead manifest_read = 15;
+    // From the harness.
+    ManifestResult manifest_result = 16;
+    // To the harness.
+    ApplyRequest apply = 17;
+    // From the harness.
+    ApplyResult apply_result = 18;
+
+    // To the harness.
+    FaultRequest fault = 19;
+    // From the harness.
+    FaultResult fault_result = 20;
+    // To the harness.
+    RevertFault revert_fault = 21;
+    // From the harness.
+    RevertFaultResult revert_fault_result = 22;
+
+    // To the harness.
+    CheckRequest check = 23;
+    // From the harness.
+    CheckResults check_results = 24;
+
+    // From the harness, first once the cluster is ready and after every SnapshotRequest.
+    TopologySnapshot snapshot = 25;
+    // From the harness.
+    TopologyDiff diff = 26;
+    // From the harness.
+    ClusterEvent cluster_event = 27;
+  }
+}
+
+// Identifies the sandbox on a new connection. envmgr closes the connection if the token doesn't match.
+message Hello {
+  string sandbox_id = 1;
+  // The sandbox's own token, written into the VM by envmgr when it created the sandbox.
+  string token = 2;
+  string harness_version = 3;
+}
+
+// Asks for a fresh TopologySnapshot, such as after a gap in the diffs.
+message SnapshotRequest {}
+
+// How far the cluster inside the sandbox has come.
+message ClusterStatus {
+  ClusterPhase phase = 1;
+  // Detail for logs and the failure screen, such as "w2 did not join the cluster in time".
+  string message = 2;
+}
+
+// The cluster's boot stages.
+enum ClusterPhase {
+  CLUSTER_PHASE_UNSPECIFIED = 0;
+  // The node containers are starting.
+  CLUSTER_PHASE_BOOTING = 1;
+  // Every node container runs, and k3s is still joining them.
+  CLUSTER_PHASE_NODES_UP = 2;
+  // Every node is Ready, and the harness streams the topology.
+  CLUSTER_PHASE_READY = 3;
+  // The cluster didn't come up; the message says why.
+  CLUSTER_PHASE_FAILED = 4;
+}
+
+// Where a command or file operation runs.
+message Target {
+  oneof machine {
+    // The sandbox VM, which holds the learner's shell and the harness.
+    Workstation workstation = 1;
+    // A cluster node by name, such as "cp", "w1" or "w2", reached over ssh from the workstation.
+    string node = 2;
+  }
+}
+
+// Selects the workstation as a target. It has no fields.
+message Workstation {}
+
+// Runs one command, for the helper or the scenario runner. Commands on a node run through ssh as the harness's own user, so the mirrored line is a command the learner could type.
+message ExecRequest {
+  // Chosen by the sender; the output and exit frames carry it back.
+  string request_id = 1;
+  Target target = 2;
+  // The program and its arguments.
+  repeated string argv = 3;
+  // Written to the command's standard input, which is then closed.
+  bytes stdin = 4;
+  // The command is killed after this long. Not set means the harness's default.
+  google.protobuf.Duration timeout = 5;
+  // Who runs it, so the session can show the command under the right name.
+  Actor actor = 6;
+}
+
+// A chunk of a command's output.
+message ExecOutput {
+  string request_id = 1;
+  OutputStream stream = 2;
+  bytes data = 3;
+}
+
+// Which output stream a chunk came from.
+enum OutputStream {
+  OUTPUT_STREAM_UNSPECIFIED = 0;
+  OUTPUT_STREAM_STDOUT = 1;
+  OUTPUT_STREAM_STDERR = 2;
+}
+
+// A command finished. The last frame for its request.
+message ExecExit {
+  string request_id = 1;
+  // Meaningless when error is set.
+  int32 exit_code = 2;
+  google.protobuf.Duration duration = 3;
+  // Set when the command couldn't start, its node was unreachable, or it timed out.
+  Error error = 4;
+}
+
+// Opens a terminal on the workstation: the learner's shell.
+message PtyOpen {
+  // Chosen by the sender, so terminals can share the connection.
+  string pty_id = 1;
+  uint32 cols = 2;
+  uint32 rows = 3;
+}
+
+// Input for a terminal.
+message PtyInput {
+  string pty_id = 1;
+  bytes data = 2;
+}
+
+// Output from a terminal.
+message PtyOutput {
+  string pty_id = 1;
+  bytes data = 2;
+}
+
+// A terminal's window size changed.
+message PtyResize {
+  string pty_id = 1;
+  uint32 cols = 2;
+  uint32 rows = 3;
+}
+
+// A terminal's shell exited.
+message PtyClosed {
+  string pty_id = 1;
+  int32 exit_code = 2;
+}
+
+// Writes a file, or unpacks an archive, on a target. Scenario files arrive as one archive.
+message FileWrite {
+  string request_id = 1;
+  Target target = 2;
+  // An absolute path. With archive set, the directory to unpack into.
+  string path = 3;
+  bytes content = 4;
+  // Unix permission bits, such as 0644 for a file. Not set means 0644.
+  optional uint32 mode = 5;
+  // The content is a gzipped tar archive to unpack at path.
+  bool archive = 6;
+}
+
+// Reads a file on a target.
+message FileRead {
+  string request_id = 1;
+  Target target = 2;
+  // An absolute path.
+  string path = 3;
+}
+
+// The reply to FileWrite or FileRead.
+message FileResult {
+  string request_id = 1;
+  // The file's content for a read. Empty for a write.
+  bytes content = 2;
+  Error error = 3;
+}
+
+// Asks for one resource's YAML.
+message ManifestRead {
+  string request_id = 1;
+  string entity_id = 2;
+}
+
+// The reply to ManifestRead.
+message ManifestResult {
+  string request_id = 1;
+  Manifest manifest = 2;
+  Error error = 3;
+}
+
+// Applies YAML to the cluster, as kubectl apply does.
+message ApplyRequest {
+  string request_id = 1;
+  // One or more documents separated by "---".
+  string yaml = 2;
+  // Who applied it: the learner from the inspector, the helper or the scenario runner.
+  Actor actor = 3;
+}
+
+// The result of an apply. The same message answers the browser's ApplyManifest.
+message ApplyResult {
+  string request_id = 1;
+  // One line per object as kubectl prints it, such as "service/web configured".
+  repeated string applied = 2;
+  Error error = 3;
+}
+
+// Injects a fault.
+message FaultRequest {
+  string request_id = 1;
+  Fault fault = 2;
+}
+
+// A fault the harness can inject. Each kind has its own harness code, so a new kind is a new case here.
+message Fault {
+  oneof kind {
+    StopNode stop_node = 1;
+    StopService stop_service = 2;
+    DeletePod delete_pod = 3;
+    BadImage bad_image = 4;
+  }
+}
+
+// Stops a node's container, as if the machine lost power.
+message StopNode {
+  // Such as "w2".
+  string node = 1;
+}
+
+// Stops a systemd unit on a node.
+message StopService {
+  string node = 1;
+  // Such as "k3s-agent".
+  string unit = 2;
+}
+
+// Deletes a pod, so its controller replaces it.
+message DeletePod {
+  string pod_id = 1;
+}
+
+// Sets an image that can't be pulled on one container of a Deployment.
+message BadImage {
+  string deployment_id = 1;
+  // The container's name.
+  string container = 2;
+  // Such as "nginx:does-not-exist".
+  string image = 3;
+}
+
+// The reply to FaultRequest.
+message FaultResult {
+  string request_id = 1;
+  // Chosen by the harness, so the fault can be marked in the UI and reverted.
+  string fault_id = 2;
+  // The entities the fault affects, which the graph marks.
+  repeated string target_ids = 3;
+  // A short description for the UI, such as "Stopped k3s-agent on w2".
+  string description = 4;
+  Error error = 5;
+}
+
+// Undoes a fault.
+message RevertFault {
+  string request_id = 1;
+  string fault_id = 2;
+}
+
+// The reply to RevertFault.
+message RevertFaultResult {
+  string request_id = 1;
+  string fault_id = 2;
+  Error error = 3;
+}
+
+// Runs checks once.
+message CheckRequest {
+  string request_id = 1;
+  repeated CheckSpec checks = 2;
+}
+
+// One check from a scenario step.
+message CheckSpec {
+  // Unique within the scenario.
+  string id = 1;
+  // Shown in the checklist, such as "Service web exists in namespace shop".
+  string title = 2;
+  // The resource the UI draws the result at, such as the Ingress where an HTTP check enters the cluster. Not set means no place on the graph.
+  ResourceRef subject = 3;
+  oneof kind {
+    ResourceCheck resource = 4;
+    HttpCheck http = 5;
+    CommandCheck command = 6;
+  }
+}
+
+// Names a resource the way a scenario file does, before its UID is known.
+message ResourceRef {
+  // The Kubernetes kind, such as "Deployment".
+  string kind = 1;
+  // Empty for cluster-scoped kinds.
+  string namespace = 2;
+  string name = 3;
+}
+
+// Passes when the resource exists and, if json_path is set, the value there equals the expected text.
+message ResourceCheck {
+  ResourceRef resource = 1;
+  // A kubectl JSONPath expression, such as "{.status.readyReplicas}". Empty checks only that the resource exists.
+  string json_path = 2;
+  // Compared as text with the value at json_path.
+  string equals = 3;
+}
+
+// Passes when an HTTP GET from the workstation returns the expected status.
+message HttpCheck {
+  string url = 1;
+  // The Host header to send, for Ingress rules. Empty uses the URL's host.
+  string host = 2;
+  uint32 expected_status = 3;
+}
+
+// Passes when a command exits with the expected code.
+message CommandCheck {
+  Target target = 1;
+  // The program and its arguments.
+  repeated string argv = 2;
+  int32 expected_exit = 3;
+}
+
+// The reply to CheckRequest, one result per check in the same order.
+message CheckResults {
+  string request_id = 1;
+  repeated CheckResult results = 2;
+}
+
+// The outcome of one check.
+message CheckResult {
+  // The CheckSpec's id.
+  string id = 1;
+  bool passed = 2;
+  // What the check last saw, such as "503", "0 endpoints" or "exit 1".
+  string observed = 3;
+  // An explanation for the learner, mainly when it failed.
+  string message = 4;
+  // The subject's entity ID, resolved when the check ran. Empty when the check has no subject or the subject doesn't exist.
+  string subject_id = 5;
+}

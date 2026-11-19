@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package kubernetes_learning.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// One object in the cluster graph: a Kubernetes resource or a node. Every kind uses this message, so a new kind needs no schema change.
+message Entity {
+  // The Kubernetes UID.
+  string id = 1;
+  // The Kubernetes kind, such as "Pod", "Service", "Node" or "HTTPRoute".
+  string kind = 2;
+  // Empty for the core group, such as "apps" or "gateway.networking.k8s.io" otherwise.
+  string api_group = 3;
+  // Empty for cluster-scoped kinds.
+  string namespace = 4;
+  string name = 5;
+  EntityStatus status = 6;
+  map<string, string> labels = 7;
+  // The matchLabels of a Service, Deployment or ReplicaSet; empty for other kinds.
+  map<string, string> selector = 8;
+  // Short labelled values for the inspector's summary, in display order.
+  repeated Fact facts = 9;
+}
+
+// What the graph draws for an entity and what the inspector shows.
+message EntityStatus {
+  Health health = 1;
+  // The phase as Kubernetes reports it, such as "Running", "Pending" or "NotReady".
+  string phase = 2;
+  // Why it isn't healthy, such as "CrashLoopBackOff" or "ImagePullBackOff". Empty when healthy.
+  string reason = 3;
+  // Ready replicas of a workload, or ready containers of a pod. Not set for kinds without readiness.
+  optional uint32 ready = 4;
+  // Desired replicas of a workload, or containers of a pod.
+  optional uint32 desired = 5;
+  // Container restarts, summed over a pod's containers.
+  uint32 restarts = 6;
+}
+
+// Picks an entity's shape and glyph. The words come from phase and reason.
+enum Health {
+  HEALTH_UNSPECIFIED = 0;
+  // Drawn as a dot.
+  HEALTH_OK = 1;
+  // Starting or rolling out, drawn as a ring.
+  HEALTH_PROGRESSING = 2;
+  HEALTH_WARNING = 3;
+  // Drawn as a cross.
+  HEALTH_ERROR = 4;
+  // The harness can't tell, such as for a node whose container stopped.
+  HEALTH_UNKNOWN = 5;
+  // Being deleted, drawn as a minus.
+  HEALTH_TERMINATING = 6;
+}
+
+// A labelled value in the inspector's summary, such as "Image", "Node IP" or "Kubelet".
+message Fact {
+  string key = 1;
+  string value = 2;
+}
+
+// A relation between two entities.
+message Edge {
+  // "<type>:<from_id>:<to_id>", with missing_target in place of to_id when the target doesn't exist.
+  string id = 1;
+  EdgeType type = 2;
+  string from_id = 3;
+  // Empty when the target doesn't exist.
+  string to_id = 4;
+  // What the edge points at when to_id is empty, such as "Service shop/web". The edge is then BROKEN.
+  string missing_target = 5;
+  EdgeState state = 6;
+}
+
+// What a relation means.
+enum EdgeType {
+  EDGE_TYPE_UNSPECIFIED = 0;
+  // An owner reference, such as a Deployment owning a ReplicaSet.
+  EDGE_TYPE_OWNS = 1;
+  // A pod runs on a node.
+  EDGE_TYPE_RUNS_ON = 2;
+  // An Ingress or route sends traffic to a Service.
+  EDGE_TYPE_ROUTES_TO = 3;
+  // A Service's selector matches a pod. The state says whether the endpoint is ready.
+  EDGE_TYPE_SELECTS = 4;
+  // A pod mounts a ConfigMap, Secret or PersistentVolumeClaim.
+  EDGE_TYPE_MOUNTS = 5;
+  // A pod refers to a ConfigMap or Secret in its environment, or to its ServiceAccount.
+  EDGE_TYPE_USES = 6;
+}
+
+// Whether a relation works.
+enum EdgeState {
+  EDGE_STATE_UNSPECIFIED = 0;
+  EDGE_STATE_OK = 1;
+  // The relation exists but doesn't serve, such as an endpoint that isn't ready.
+  EDGE_STATE_NOT_READY = 2;
+  // The relation can't work, such as a route to a Service that doesn't exist.
+  EDGE_STATE_BROKEN = 3;
+}
+
+// The whole cluster graph, across every namespace, at one revision. Sent first on a connection and after a resync.
+message TopologySnapshot {
+  // Grows with every change. A diff applies only to the state at its from_revision.
+  uint64 revision = 1;
+  google.protobuf.Timestamp at = 2;
+  repeated Entity entities = 3;
+  repeated Edge edges = 4;
+}
+
+// The changes from one revision to the next. On a gap in revisions, the receiver asks for a snapshot.
+message TopologyDiff {
+  uint64 from_revision = 1;
+  uint64 to_revision = 2;
+  google.protobuf.Timestamp at = 3;
+  // New or changed entities, each sent whole.
+  repeated Entity upserted_entities = 4;
+  repeated string removed_entity_ids = 5;
+  // New or changed edges, each sent whole.
+  repeated Edge upserted_edges = 6;
+  repeated string removed_edge_ids = 7;
+}
+
+// A Kubernetes event, shown in the event list and on the entity it involves.
+message ClusterEvent {
+  // The event's UID. A repeated event keeps its ID and gains count.
+  string id = 1;
+  // When it last happened.
+  google.protobuf.Timestamp at = 2;
+  // The entity it is about, empty when that isn't in the graph.
+  string involved_id = 3;
+  // A Warning event rather than a Normal one.
+  bool warning = 4;
+  // One word, such as "BackOff" or "FailedScheduling".
+  string reason = 5;
+  string message = 6;
+  // How many times Kubernetes has seen it.
+  uint32 count = 7;
+}
+
+// The requests a Service received during one sample, by the pod that served them.
+message TrafficSample {
+  string service_id = 1;
+  // The end of the sample.
+  google.protobuf.Timestamp at = 2;
+  // Request counts by pod entity ID.
+  map<string, uint32> hits_by_pod_id = 3;
+}
+
+// One resource's YAML, read on demand for the inspector. Snapshots and diffs never carry YAML.
+message Manifest {
+  string entity_id = 1;
+  // The topology revision it was read at.
+  uint64 revision = 2;
+  // The resource as YAML, without managedFields.
+  string yaml = 3;
+}

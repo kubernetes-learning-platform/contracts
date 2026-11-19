@@ -4,7 +4,7 @@
 
 Part of [kubernetes-learning-platform](https://github.com/kubernetes-learning-platform/docs), a live Kubernetes lab with an optional AI helper. The [docs repository](https://github.com/kubernetes-learning-platform/docs) describes the overall system.
 
-**Owner:** Filip · **Status:** buf and both packages are set up; the schema itself is not written yet. A `v0.1` with stub messages ships early in M1 so `api` and `web` can build against real types.
+**Owner:** Filip · **Status:** the `v0.1` schema covers the whole lab as designed, so `api` and `web` build against real types even where the behaviour comes later. It follows the [v0.1 schema plan](https://github.com/kubernetes-learning-platform/docs/blob/main/plans/schema-v0.1.md).
 
 ---
 
@@ -42,7 +42,7 @@ Every message that crosses a process boundary is defined here, once:
 |---|---|---|
 | browser ↔ `api` | WebSocket, binary frames | `ClientMessage` / `ServerMessage` |
 | browser → `api` | REST | request/response bodies |
-| `api` ↔ `envmgr` | gRPC on the course VM, plain HTTP/2 | `EnvironmentManager` service |
+| `api` ↔ `envmgr` | gRPC on the course VM, plain HTTP/2 | `EnvironmentManagerService` |
 | `api` ↔ `envmgr` | RabbitMQ (sandbox start and teardown only) | `ProvisionRequest`, `ProvisionResult`, `TeardownRequest` |
 | `envmgr` ↔ `harness` | WebSocket, one binary message per frame (every provider) | `HarnessFrame` |
 
@@ -54,14 +54,26 @@ All under `proto/kubernetes_learning/v1/`:
 
 | File | Defines |
 |---|---|
-| `common.proto` | IDs, timestamps, errors |
-| `envmgr.proto` | The `EnvironmentManager` gRPC service, `Sandbox`, `SandboxStatus` |
-| `harness.proto` | `HarnessFrame` plus the hello (sandbox id + one-time token), exec, PTY, file, fault, check and snapshot-request messages |
-| `topology.proto` | `Entity`, `Edge`, `TopologySnapshot`, `TopologyDiff`, `ClusterEvent`, `TrafficSample` |
+| `common.proto` | `Error` and its `ErrorCode`; `Actor`, who caused something |
+| `envmgr.proto` | The `EnvironmentManagerService` gRPC service, `Sandbox`, `SandboxStatus` |
+| `harness.proto` | `HarnessFrame`: the hello (sandbox id + token), cluster status, exec, PTY, files, manifests and apply, faults, checks, and the topology stream |
+| `topology.proto` | `Entity`, `Edge`, `TopologySnapshot`, `TopologyDiff`, `ClusterEvent`, `TrafficSample`, `Manifest` |
 | `view.proto` | `ViewIntent`: focus, highlight, annotate, show_config, clear |
-| `session.proto` | `ClientMessage` / `ServerMessage` for the browser socket, including helper questions (`AgentQuestion`, `AgentAnswer`), `HelperState` and `ScenarioProgress` |
-| `rest.proto` | REST request and response bodies |
+| `session.proto` | `ClientMessage` / `ServerMessage` for the browser socket, including `SessionStatus`, `HelperState`, helper questions (`AgentQuestion`, `AgentAnswer`) and `ScenarioProgress` |
+| `rest.proto` | REST bodies: login, sessions, the scenario catalog and replay pages (`EventBatch`) |
 | `jobs.proto` | `ProvisionRequest`, `ProvisionResult`, `TeardownRequest` for the RabbitMQ work queue |
+
+Every file shares the package `kubernetes_learning.v1`, so a message name is unique across all of them. C# gets the namespace `KubernetesLearning.V1`; there are no file options.
+
+### Conventions
+
+- **IDs** are strings. Sessions, sandboxes, requests, questions and faults use UUIDs. A topology entity's ID is its Kubernetes UID, and an edge's is `<type>:<from_id>:<to_id>`.
+- **Times** are `google.protobuf.Timestamp` and `google.protobuf.Duration`, which both packages map to native types.
+- **Requests and replies:** a request carries a `request_id` chosen by the sender, and its reply carries it back, so replies match without ordering assumptions.
+- **Failures** are an `Error`: a code, a message that is safe to show, and whether a retry can work. REST errors return it as the body.
+- **REST bodies** use the proto3 JSON mapping. The replay pages (`EventBatch`) are binary `application/x-protobuf`.
+- **Growth:** `ClientMessage`, `ServerMessage` and `HarnessFrame` grow through their `oneof`. Fields use proto3 `optional` where "not set" differs from zero.
+- **TypeScript:** the `Error` message shadows the global `Error` when imported by name, so import it under another one: `import type { Error as ContractError } from "@kubernetes-learning-platform/contracts"`.
 
 ## Packages
 
@@ -148,6 +160,7 @@ On every PR, CI runs `platform`'s `proto-ci.yml`: the lint-copy check, buf lint,
 
 - [ARCHITECTURE §5 Contracts](https://github.com/kubernetes-learning-platform/docs/blob/main/ARCHITECTURE.md#5-contracts)
 - [ARCHITECTURE §6 Key flows](https://github.com/kubernetes-learning-platform/docs/blob/main/ARCHITECTURE.md#6-key-flows)
+- [The v0.1 schema plan](https://github.com/kubernetes-learning-platform/docs/blob/main/plans/schema-v0.1.md), now history: the `.proto` files are the source of truth
 
 ## License
 

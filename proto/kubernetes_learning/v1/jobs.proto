@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package kubernetes_learning.v1;
+
+import "kubernetes_learning/v1/common.proto";
+
+// Asks for a sandbox for a session. api publishes it to the work queue, and an envmgr takes it when it has room. Every sandbox is the same, so it names no scenario.
+message ProvisionRequest {
+  // Chosen by api; the result carries it back.
+  string request_id = 1;
+  string session_id = 2;
+}
+
+// envmgr's answer to a ProvisionRequest.
+message ProvisionResult {
+  string request_id = 1;
+  oneof outcome {
+    Provisioned provisioned = 2;
+    Error failed = 3;
+  }
+}
+
+// The sandbox a session got.
+message Provisioned {
+  string sandbox_id = 1;
+  // The gRPC address of the envmgr that runs it. api opens Connect there.
+  string host = 2;
+}
+
+// Asks the envmgr that runs a session's sandbox to destroy it.
+message TeardownRequest {
+  string request_id = 1;
+  string session_id = 2;
+  string sandbox_id = 3;
+}

@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package kubernetes_learning.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "kubernetes_learning/v1/session.proto";
+
+// REST bodies use the proto3 JSON mapping, except the event pages, which are binary. A failed request returns Error as its body.
+
+// The body of POST /api/auth/login. The sign-in mechanism is still open; the design signs in with a name only.
+message LoginRequest {
+  string display_name = 1;
+}
+
+// The signed-in account, from login and GET /api/auth/me.
+message User {
+  string id = 1;
+  string display_name = 2;
+}
+
+// The body of POST /api/sessions.
+message CreateSessionRequest {
+  // The scenario to start. Not set starts a blank cluster.
+  optional string scenario_id = 1;
+}
+
+// A learner's session, live or past.
+message Session {
+  string id = 1;
+  // Not set for a blank cluster.
+  optional string scenario_id = 2;
+  SessionPhase phase = 3;
+  google.protobuf.Timestamp created_at = 4;
+  // Not set until the session goes live.
+  google.protobuf.Timestamp started_at = 5;
+  // Not set until the session ends.
+  google.protobuf.Timestamp ended_at = 6;
+  // Checks passed in the current step, for the home screen's "1 of 2 checks".
+  uint32 checks_passed = 7;
+  uint32 checks_total = 8;
+  // Set once the scenario is complete.
+  SessionSummary summary = 9;
+}
+
+// The numbers on a completed scenario's summary.
+message SessionSummary {
+  google.protobuf.Duration duration = 1;
+  uint32 checks_passed = 2;
+  uint32 hints_used = 3;
+  uint32 helper_turns = 4;
+}
+
+// The body of GET /api/sessions: this account's sessions.
+message ListSessionsResponse {
+  repeated Session sessions = 1;
+}
+
+// A scenario on the home screen, with this account's progress.
+message ScenarioSummary {
+  string id = 1;
+  string title = 2;
+  ScenarioLevel level = 3;
+  // One line for the home screen.
+  string summary = 4;
+  // Scenario IDs to complete first.
+  repeated string prerequisites = 5;
+  ProgressStatus status = 6;
+  // The helper demonstrated at least one step for this account. Those steps still count.
+  bool helper_demonstrated = 7;
+}
+
+// How hard a scenario is.
+enum ScenarioLevel {
+  SCENARIO_LEVEL_UNSPECIFIED = 0;
+  SCENARIO_LEVEL_BEGINNER = 1;
+  SCENARIO_LEVEL_INTERMEDIATE = 2;
+  SCENARIO_LEVEL_ADVANCED = 3;
+}
+
+// An account's progress on a scenario.
+enum ProgressStatus {
+  PROGRESS_STATUS_UNSPECIFIED = 0;
+  PROGRESS_STATUS_NOT_STARTED = 1;
+  PROGRESS_STATUS_IN_PROGRESS = 2;
+  PROGRESS_STATUS_COMPLETED = 3;
+}
+
+// The body of GET /api/scenarios/{id}. Hint text isn't included; hints open over the session socket.
+message ScenarioDetail {
+  ScenarioSummary summary = 1;
+  repeated StepInfo steps = 2;
+}
+
+// One step of a scenario, as the scenario panel lists it.
+message StepInfo {
+  string id = 1;
+  // What the learner should achieve.
+  string goal = 2;
+  // A challenge step the learner can skip.
+  bool optional = 3;
+  uint32 hint_count = 4;
+  // The titles of the step's checks, in order.
+  repeated string check_titles = 5;
+}
+
+// The body of GET /api/scenarios.
+message ListScenariosResponse {
+  repeated ScenarioSummary scenarios = 1;
+  // How many of them this account completed.
+  uint32 completed_count = 2;
+}
+
+// A page of a session's server messages from GET /api/sessions/{id}/events, for the timeline and replay. Sent as application/x-protobuf.
+message EventBatch {
+  repeated ServerMessage events = 1;
+  // The afterSeq for the next page.
+  uint64 next_after_seq = 2;
+  // No messages follow this page.
+  bool end = 3;
+}

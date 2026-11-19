@@ -1,0 +1,315 @@
+syntax = "proto3";
+
+package kubernetes_learning.v1;
+
+import "google/protobuf/timestamp.proto";
+import "kubernetes_learning/v1/common.proto";
+import "kubernetes_learning/v1/harness.proto";
+import "kubernetes_learning/v1/topology.proto";
+import "kubernetes_learning/v1/view.proto";
+
+// A frame from the browser on the session socket.
+message ClientMessage {
+  oneof body {
+    ChatSend chat_send = 1;
+    TerminalInput terminal_input = 2;
+    TerminalResize terminal_resize = 3;
+    ApplyManifest apply_manifest = 4;
+    ManifestRequest manifest_request = 5;
+    HelperStop helper_stop = 6;
+    AgentAnswer agent_answer = 7;
+    HintRequest hint_request = 8;
+    ScenarioNext scenario_next = 9;
+    StepReset step_reset = 10;
+    Resync resync = 11;
+  }
+}
+
+// A message from the learner to the helper.
+message ChatSend {
+  string text = 1;
+}
+
+// Keystrokes for the learner's terminal. Refused with FORBIDDEN while the helper is acting and UNAVAILABLE while reconnecting.
+message TerminalInput {
+  bytes data = 1;
+}
+
+// The learner's terminal changed size.
+message TerminalResize {
+  uint32 cols = 1;
+  uint32 rows = 2;
+}
+
+// Applies YAML edited in the inspector. Answered with ApplyResult, and refused like TerminalInput.
+message ApplyManifest {
+  // Chosen by the browser; the reply carries it back.
+  string request_id = 1;
+  string yaml = 2;
+}
+
+// Asks for one resource's YAML for the inspector. Answered with ManifestResponse.
+message ManifestRequest {
+  // Chosen by the browser; the reply carries it back.
+  string request_id = 1;
+  string entity_id = 2;
+}
+
+// Stops the helper's current turn.
+message HelperStop {}
+
+// The learner's answer to an AgentQuestion.
+message AgentAnswer {
+  string question_id = 1;
+  oneof answer {
+    // One of the question's options.
+    string option_id = 2;
+    // A free-text answer.
+    string text = 3;
+  }
+}
+
+// Opens the next hint of a step. Answered with HintRevealed.
+message HintRequest {
+  string step_id = 1;
+}
+
+// Moves past the current step, once it passed or when it is optional.
+message ScenarioNext {
+  // The current step, so a repeated click is ignored.
+  string step_id = 1;
+}
+
+// Puts the cluster back to the step's starting state.
+message StepReset {
+  string step_id = 1;
+}
+
+// Asks for every server message after a seq, such as after the browser's socket reconnects.
+message Resync {
+  uint64 after_seq = 1;
+}
+
+// A frame from api on the session socket. api persists every one before sending it, so replay feeds the same messages back.
+message ServerMessage {
+  // Starts at 1 and grows by one per session.
+  uint64 seq = 1;
+  google.protobuf.Timestamp at = 2;
+  // Who caused it, for the replay timeline. Also tells the chat and terminal whose text this is.
+  Actor actor = 3;
+  oneof body {
+    SessionStatus session_status = 4;
+    HelperState helper_state = 5;
+    ChatDelta chat_delta = 6;
+    ChatMessage chat_message = 7;
+    ToolCallStarted tool_call_started = 8;
+    ToolCallFinished tool_call_finished = 9;
+    AgentQuestion agent_question = 10;
+    AgentQuestionClosed agent_question_closed = 11;
+    TerminalOutput terminal_output = 12;
+    TopologySnapshot topology_snapshot = 13;
+    TopologyDiff topology_diff = 14;
+    ClusterEvent cluster_event = 15;
+    ViewIntent view_intent = 16;
+    FaultMarked fault_marked = 17;
+    FaultReverted fault_reverted = 18;
+    TrafficSample traffic_sample = 19;
+    ScenarioProgress scenario_progress = 20;
+    HintRevealed hint_revealed = 21;
+    ManifestResponse manifest_response = 22;
+    // Answers ApplyManifest, or reports an apply by the helper or the scenario runner.
+    ApplyResult apply_result = 23;
+    // A failed request that has no reply of its own, such as refused terminal input.
+    Error error = 24;
+  }
+}
+
+// The session's lifecycle. Sent first on every connection and on every change.
+message SessionStatus {
+  SessionPhase phase = 1;
+  // The number of sessions ahead in the queue. QUEUED only.
+  optional uint32 queue_position = 2;
+  // STARTING only.
+  StartingStep starting_step = 3;
+  // When the session went live.
+  google.protobuf.Timestamp started_at = 4;
+  // RECONNECTING only, counting from 1.
+  optional uint32 reconnect_attempt = 5;
+  // RECONNECTING only: when the last state arrived, for "showing the state from 14:02:11".
+  google.protobuf.Timestamp last_state_at = 6;
+  // FAILED only, such as "w2 did not join the cluster in time".
+  Error failure = 7;
+  // ENDED only.
+  SessionEndReason end_reason = 8;
+}
+
+// A session's stages.
+enum SessionPhase {
+  SESSION_PHASE_UNSPECIFIED = 0;
+  // Waiting for a sandbox while every host is at its cap.
+  SESSION_PHASE_QUEUED = 1;
+  SESSION_PHASE_STARTING = 2;
+  SESSION_PHASE_LIVE = 3;
+  // api lost the link to the sandbox and is redialing. The lab holds the last state, and Apply and the terminal are refused.
+  SESSION_PHASE_RECONNECTING = 4;
+  SESSION_PHASE_ENDED = 5;
+  SESSION_PHASE_FAILED = 6;
+}
+
+// What a starting session waits for. The warm pool's sandboxes already run their cluster, so there is one wait for the sandbox.
+enum StartingStep {
+  STARTING_STEP_UNSPECIFIED = 0;
+  STARTING_STEP_WAITING_FOR_SANDBOX = 1;
+  // api is opening Connect to the sandbox.
+  STARTING_STEP_CONNECTING = 2;
+  // The scenario runner is sending the scenario's files and applying its first step.
+  STARTING_STEP_APPLYING_SCENARIO = 3;
+}
+
+// Why a session ended.
+enum SessionEndReason {
+  SESSION_END_REASON_UNSPECIFIED = 0;
+  // The learner ended it.
+  SESSION_END_REASON_LEARNER = 1;
+  // No input for the idle timeout.
+  SESSION_END_REASON_IDLE = 2;
+  // It reached the longest a session may run.
+  SESSION_END_REASON_MAX_LIFETIME = 3;
+  // The learner chose Start over, which starts a new session with a fresh sandbox.
+  SESSION_END_REASON_START_OVER = 4;
+}
+
+// What the helper is doing and how much of its budget is left.
+message HelperState {
+  HelperPhase phase = 1;
+  // The fraction of the session's token budget left, from 0 to 1. The lab draws it as a bar.
+  float budget_left = 2;
+  // OFF only.
+  HelperOffReason off_reason = 3;
+}
+
+// The helper's stages.
+enum HelperPhase {
+  HELPER_PHASE_UNSPECIFIED = 0;
+  // Waiting for a chat message.
+  HELPER_PHASE_IDLE = 1;
+  // Running a turn. The terminal and inspector are read-only, with a Stop button.
+  HELPER_PHASE_ACTING = 2;
+  // Waiting for the learner's answer to an AgentQuestion.
+  HELPER_PHASE_WAITING = 3;
+  // Unavailable for the rest of the session.
+  HELPER_PHASE_OFF = 4;
+}
+
+// Why the helper is off.
+enum HelperOffReason {
+  HELPER_OFF_REASON_UNSPECIFIED = 0;
+  // The session's token budget is used up.
+  HELPER_OFF_REASON_BUDGET_USED = 1;
+  // No LLM is configured.
+  HELPER_OFF_REASON_NOT_CONFIGURED = 2;
+}
+
+// Part of a helper reply while it streams. The ChatMessage with the same message_id replaces the parts.
+message ChatDelta {
+  string message_id = 1;
+  string text = 2;
+}
+
+// A whole chat message: the learner's, or the helper's once it finished streaming.
+message ChatMessage {
+  string message_id = 1;
+  string text = 2;
+}
+
+// The helper started a tool, shown as a step in the chat.
+message ToolCallStarted {
+  string call_id = 1;
+  // The tool's name, such as "run_command" or "focus".
+  string tool = 2;
+  // One line for the chat, such as "Checking the pods in shop".
+  string summary = 3;
+  // The command it runs, when the tool runs one, such as "kubectl get pods -n shop".
+  string command = 4;
+}
+
+// A tool finished.
+message ToolCallFinished {
+  string call_id = 1;
+  bool ok = 2;
+  // Set when the tool ran a command.
+  optional int32 exit_code = 3;
+  Error error = 4;
+}
+
+// The helper asks the learner something and waits for the answer.
+message AgentQuestion {
+  string question_id = 1;
+  string text = 2;
+  // Suggested answers. The learner can also answer in free text.
+  repeated QuestionOption options = 3;
+}
+
+// One suggested answer to an AgentQuestion.
+message QuestionOption {
+  string option_id = 1;
+  string label = 2;
+}
+
+// A question was answered, by an option, free text or a chat message, so every tab and the replay close its card.
+message AgentQuestionClosed {
+  string question_id = 1;
+  // The answer as the learner gave it, or the chosen option's label.
+  string answer_text = 2;
+}
+
+// Output for the learner's terminal: their shell's, or a command the helper or scenario runner runs, mirrored. The envelope's actor says which.
+message TerminalOutput {
+  bytes data = 1;
+}
+
+// A fault is active, so the graph marks its targets.
+message FaultMarked {
+  string fault_id = 1;
+  repeated string target_ids = 2;
+  // Such as "Stopped k3s-agent on w2".
+  string description = 3;
+}
+
+// A fault was reverted, so its marks go away.
+message FaultReverted {
+  string fault_id = 1;
+}
+
+// Where the learner is in the scenario and how the current step's checks stand.
+message ScenarioProgress {
+  string scenario_id = 1;
+  string step_id = 2;
+  // Counts from 0. The lab shows "Step 2 of 2" for index 1 of 2.
+  uint32 step_index = 3;
+  uint32 step_count = 4;
+  // A challenge step the learner can skip.
+  bool step_optional = 5;
+  repeated CheckResult checks = 6;
+  // Every check of the step passed, so the lab shows Next.
+  bool step_passed = 7;
+  uint32 hints_revealed = 8;
+  uint32 hint_count = 9;
+  // Every required step passed, so the lab shows the summary.
+  bool scenario_complete = 10;
+}
+
+// A hint the learner opened. Replay shows it at the time it was opened.
+message HintRevealed {
+  string step_id = 1;
+  // Counts from 0 within the step.
+  uint32 index = 2;
+  string text = 3;
+}
+
+// The reply to ManifestRequest.
+message ManifestResponse {
+  string request_id = 1;
+  Manifest manifest = 2;
+  Error error = 3;
+}

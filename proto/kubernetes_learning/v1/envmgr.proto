@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package kubernetes_learning.v1;
+
+import "google/protobuf/timestamp.proto";
+import "kubernetes_learning/v1/harness.proto";
+
+// envmgr's gRPC service, which api and the sbx dev CLI call. In real mode, api starts and tears down sandboxes through the work queue in jobs.proto instead of CreateSandbox and DestroySandbox.
+service EnvironmentManagerService {
+  // Takes a sandbox from the warm pool, or clones one from the template.
+  rpc CreateSandbox(CreateSandboxRequest) returns (CreateSandboxResponse);
+  // Stops and deletes a sandbox, and frees its address and token.
+  rpc DestroySandbox(DestroySandboxRequest) returns (DestroySandboxResponse);
+  rpc GetSandbox(GetSandboxRequest) returns (GetSandboxResponse);
+  // Every sandbox on this host, for debugging and demos.
+  rpc ListSandboxes(ListSandboxesRequest) returns (ListSandboxesResponse);
+  // Streams a sandbox's status changes, starting with its current status.
+  rpc WatchSandbox(WatchSandboxRequest) returns (stream WatchSandboxResponse);
+  // Relays HarnessFrames between api and a sandbox's harness. The sandbox is named in the "sandbox-id" metadata header.
+  rpc Connect(stream ConnectRequest) returns (stream ConnectResponse);
+}
+
+// A sandbox: one VM holding the learner's workstation and the cluster's node containers.
+message Sandbox {
+  string id = 1;
+  SandboxPhase phase = 2;
+  // The gRPC address of the envmgr that runs it.
+  string host = 3;
+  google.protobuf.Timestamp created_at = 4;
+  // The cluster's node names, such as "cp", "w1" and "w2".
+  repeated string nodes = 5;
+}
+
+// A sandbox's lifecycle.
+enum SandboxPhase {
+  SANDBOX_PHASE_UNSPECIFIED = 0;
+  // The VM or its cluster is starting.
+  SANDBOX_PHASE_BOOTING = 1;
+  // The cluster is ready and the sandbox waits in the warm pool.
+  SANDBOX_PHASE_READY = 2;
+  // A session holds it.
+  SANDBOX_PHASE_IN_USE = 3;
+  SANDBOX_PHASE_FAILED = 4;
+  SANDBOX_PHASE_DESTROYING = 5;
+}
+
+// One status change of a sandbox.
+message SandboxStatus {
+  string sandbox_id = 1;
+  SandboxPhase phase = 2;
+  // Detail for logs, such as why it failed.
+  string message = 3;
+  google.protobuf.Timestamp at = 4;
+}
+
+// The request for CreateSandbox.
+message CreateSandboxRequest {}
+
+// The response from CreateSandbox.
+message CreateSandboxResponse {
+  Sandbox sandbox = 1;
+}
+
+// The request for DestroySandbox.
+message DestroySandboxRequest {
+  string sandbox_id = 1;
+}
+
+// The response from DestroySandbox.
+message DestroySandboxResponse {}
+
+// The request for GetSandbox.
+message GetSandboxRequest {
+  string sandbox_id = 1;
+}
+
+// The response from GetSandbox.
+message GetSandboxResponse {
+  Sandbox sandbox = 1;
+}
+
+// The request for ListSandboxes.
+message ListSandboxesRequest {}
+
+// The response from ListSandboxes.
+message ListSandboxesResponse {
+  repeated Sandbox sandboxes = 1;
+}
+
+// The request for WatchSandbox.
+message WatchSandboxRequest {
+  string sandbox_id = 1;
+}
+
+// The response from WatchSandbox.
+message WatchSandboxResponse {
+  SandboxStatus status = 1;
+}
+
+// A frame from api for the harness.
+message ConnectRequest {
+  HarnessFrame frame = 1;
+}
+
+// A frame from the harness for api.
+message ConnectResponse {
+  HarnessFrame frame = 1;
+}
